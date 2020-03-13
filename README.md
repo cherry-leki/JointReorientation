@@ -1,4 +1,4 @@
-# alignJointAxes
+# Joint re-orientation on skinned mesh
 In general, the fullbody animation data operates assuming that the z-axis of all joints in the T-pose is a forward vector.   
 So, it is necesasry to align the z-axis of all joints in the forward direction.   
 This code is for Maya.
