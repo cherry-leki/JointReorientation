@@ -1,6 +1,6 @@
 # Joint re-orientation on skinned mesh
 This Maya script sets the orientation of each joint to be identity while preserving the hierarchy and skinning info.   
-We used the script to fix the orientation value of joint at binding pose to be identity.   
+We used the script to modify the orientation value of the joint to identify in the binding pose.   
 The code is tested in Maya 2018 and 2019   
 ![Alt text](ResultImage.png)
 
@@ -12,7 +12,7 @@ The code is tested in Maya 2018 and 2019
 > ### How to use
 > ![Alt text](GUIImageExample.PNG)
 > * #### Display local axis of joints
->   * If box is checked, all local joint axis are displayed.
+>   * If checkbox is checked, all local joint axes are displayed.
 > * #### Aligning the z-axis of all joints
 >   * <b>Input root joint</b>: the root joint of the target skeleton   
 >     ※ You can drag and drop the joint object into the text field, but you should delete the path in the case of joint object.  
