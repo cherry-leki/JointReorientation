@@ -2,15 +2,15 @@ import maya.cmds as cmds
 from functools import partial
 
 # Unbind skin (Not used)
-# unbindKeepHistory=True: Keep history占쏙옙 占쏙옙占쌍억옙占? weight 占쏙옙占쏙옙 占쏙옙占쏙옙磯占?.
-# skinning占쏙옙 풀占쏙옙占썽서 pose占쏙옙 占쌨띰옙占쏙옙占쏙옙占쏙옙占쏙옙 占쏙옙 占쌉쇽옙占쏙옙 占쏙옙占쏙옙占쏙옙占? 占십곤옙 占쏙옙占쏙옙.
+# unbindKeepHistory=True: Keep skinCluster history so that skin weights are preserved
+# even after unbinding. This allows you to rebind the skin later without losing weight information.
 def unbindSkinFunc():
     cmds.skinCluster('kFBXASC045modelShape', e=True, unbind=True, unbindKeepHistory=True, lw=True)
     #cmds.joint('LeftLeg', e=1, ch=1, oj='xyz', sao='yup')
     
     
 # Bind skin (Not used)
-# bindMethod=2: heat map 占쏙옙占쏙옙占쏙옙占? bind
+# bindMethod=2: Uses heatmap binding for smoother initial weight distribution.
 def bindSkinFunc():
     cmds.select('kFBXASC045model', add=True)
     cmds.select('Hips', add=True)
@@ -18,8 +18,8 @@ def bindSkinFunc():
 
 
 # Set moveJointsMode flag in skinCluster function
-# mjm = True: joints can be moved without modifying the skinning (skining占쏙옙 占쏙옙占쏙옙占쏙옙占쏙옙 占십곤옙 joint占쏙옙 占쏙옙占쏙옙 占쏙옙占쏙옙)
-# After modifying joints, set the mjm=False for taking the skin out of move joints mode(joint 占쏙옙占쏙옙 占식울옙 False占쏙옙 占쏙옙占쏙옙占싹깍옙)
+# mjm = True: joints can be moved without modifying the skinning (skining system allows joint transformations without affecting skin weights)
+# After modifying joints, set the mjm=False for taking the skin out of move joints mode(joint transformations are no longer allowed without affecting skin weights)
 def setMoveJointsMode(skinModel, mode):
     #skinModel = skinModel + "Shape"
     cmds.skinCluster(skinModel, e=True, mjm=mode)
@@ -28,8 +28,8 @@ def setMoveJointsMode(skinModel, mode):
 
 # Create new skeleton
 # parentJoint: current selected joint of the original skeleton
-# rootJoint: the root joint of the original skeleton (aligning占쏙옙 skeleton占쏙옙 root joint)
-# copyRootJoint: the root joint of the copied skeleton (占쏙옙 占쏙옙占썹를 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 skeleton占쏙옙 root joint)
+# rootJoint: the root joint of the original skeleton (aligning the skeleton's root joint)
+# copyRootJoint: the root joint of the copied skeleton (the copied skeleton's root joint)
 def createChildJoint(parentJoint, rootJoint, copyRootJoint) :
     cmds.select(rootJoint, hi=True)
     cmds.select(cmds.ls(parentJoint, sl=1))
@@ -69,8 +69,8 @@ def showAllJointLocalAxis(showAxis, *args):
 
 # Copy transform values of copied skeleton to original skeleton
 # parentJoint: current selected joint of the original skeleton
-# rootJoint: the root joint of the original skeleton (aligning占쏙옙 skeleton占쏙옙 root joint)
-# copyRootJoint: the root joint of the copied skeleton (占쏙옙 占쏙옙占썹를 占쏙옙占쏙옙 占쏙옙占쏙옙占쏙옙 skeleton占쏙옙 root joint)
+# rootJoint: the root joint of the original skeleton (aligning the skeleton's root joint)
+# copyRootJoint: the root joint of the copied skeleton (the copied skeleton's root joint)
 def copyTransformData(parentJoint, rootJoint, copyRootJoint):
     cmds.select(rootJoint, hi=True)
     cmds.select(cmds.ls(parentJoint, sl=True))
@@ -137,11 +137,52 @@ def alignJointsRotAxis(rootJoint, skinModelList, *args):
     copyTransformData(root, rootJoint, copyRootName)
     for skinModel in skinModelList:
         setMoveJointsMode(skinModel, False)
-    
+
     print("=== Aligning the original skeleton is done ===")
     
     # delete copied skeleton
     deleteSkeleton(copyRootName)
+
+def get_skinned_mesh_name_list():
+    mesh_shapes = cmds.ls(type='mesh', long=True)
+    skinned_mesh_transforms = set()
+
+    for shape in mesh_shapes:
+        if cmds.getAttr(shape + ".intermediateObject"): continue
+
+        skin_clusters = cmds.listConnections(
+            shape,
+            type='skinCluster',
+            source=True,
+            destination=False
+        )
+
+        if not skin_clusters: continue
+
+        parents = cmds.listRelatives(shape, parent=True, fullPath=True) or []
+        for p in parents:
+            skinned_mesh_transforms.add(p.split("|")[-1])
+
+    return sorted(skinned_mesh_transforms)
+
+def get_root_joints():
+    joints = cmds.ls(type='joint', long=True)
+    root_joints = []
+
+    for j in joints:
+        parent = cmds.listRelatives(j, parent=True, type='joint', fullPath=True)
+        if not parent:
+            root_joints.append(j.split("|")[-1])
+
+    return sorted(root_joints)
+    
+def autoFindRootSkin(rootJoint, skinModelList, *args):
+    assemblies = cmds.ls(assemblies=1, long=1)
+    _root_joint = get_root_joints()
+    _meshes     = get_skinned_mesh_name_list()
+    
+    rootJoint     = cmds.textField(rootJoint, e=True, tx=','.join(_root_joint))
+    skinModelList = cmds.textField(skinModelList, e=True, tx=','.join(_meshes))
 
 
 # Rotate joint function in object mode
@@ -168,7 +209,7 @@ def rotateJoint(selectedJoint, rotX, rotY, rotZ, *args):
 # UI for aligning joint rotation
 def alignmentUI():
     windowName = "Joint rotation axis controller"
-    windowSize = [310, 330]
+    windowSize = [310, 350]
     window = cmds.window(title=windowName, widthHeight=windowSize, sizeable=False)
 
     cmds.columnLayout("mainLayout")
@@ -195,6 +236,8 @@ def alignmentUI():
     cmds.text(label="Input skin model: ", p="skinLayout", w=90, align="left")
     skinModel = cmds.textField(tx="kFBXASC045model", p="skinLayout", w=150)
     # Aligning button
+    cmds.button(label="Auto find root and skin", w=windowSize[0], h=30, p="mainLayout", command=partial(autoFindRootSkin, rootJoint, skinModel))
+    cmds.text(label=" ", p="mainLayout")
     cmds.button(label="Align joints", w=windowSize[0], h=50, p="mainLayout", command=partial(alignJointsRotAxis, rootJoint, skinModel))
     
     cmds.separator(w=windowSize[0], h=30, p="mainLayout")
